@@ -1,0 +1,8 @@
+﻿{
+  "extName": {
+    "message": "WCL Combat-Time DPS Toggle"
+  },
+  "extDescription": {
+    "message": "Adds a toggle to Warcraft Logs Mythic+ tables to recalculate DPS/WDPS/HPS by combat time."
+  }
+}

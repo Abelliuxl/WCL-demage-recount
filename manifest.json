@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "WCL Combat-Time DPS Toggle",
+  "default_locale": "en",
+  "name": "__MSG_extName__",
   "version": "1.0.0",
-  "description": "Adds a toggle to Warcraft Logs Mythic+ damage tables so DPS can be recalculated by combat time instead of total run time.",
+  "description": "__MSG_extDescription__",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

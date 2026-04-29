@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   const STATE_EVENT = "wcl-combat-dps-state";
   const REQUEST_EVENT = "wcl-combat-dps-request";
   const STORAGE_KEY = "enabled";
@@ -14,6 +14,76 @@
   let enabled = DEFAULT_ENABLED;
   let widgetPosition = null;
   let dragState = null;
+
+  const UI_LANGUAGE = resolveUiLanguage();
+  const TEXT = {
+    en: {
+      combatPrefix: "Combat",
+      headerTag: "Ext",
+      widgetTitle: "Combat-Time Stats",
+      widgetSubtitle: "WCL Mythic+ Recalculation",
+      toggleAriaLabel: "Toggle combat-time stats",
+      combatTimeLabel: "Combat Time",
+      overallTimeLabel: "Overall Time",
+      waitingData: "Waiting for WCL report data to load.",
+      unsupportedView: "Current view is not damage or healing. No recalculation is applied.",
+      pullScoped:
+        "Current page is pull={pullNumber}. Warcraft Logs already uses pull-time context, so no recalculation is applied.",
+      noDungeonPulls: "Current fight is not a Mythic+ overview with dungeon pulls.",
+      invalidScale: "Unable to compute combat-time scale.",
+      activeStatus:
+        "Recalculated by combat time: x{scale}, {pullCount} pulls, converted {metricLabel}.",
+      idleStatus:
+        "Ready. Turn on to convert {metricLabel} from overall time to combat time.",
+      tooltipMetric: "Combat-time {metric}: {value}"
+    },
+    zh: {
+      combatPrefix: "\u6218\u6597",
+      headerTag: "\u6269\u5c55",
+      widgetTitle: "\u6218\u6597\u65f6\u95f4\u7edf\u8ba1",
+      widgetSubtitle: "WCL \u5927\u79d8\u5883\u603b\u89c8\u6362\u7b97",
+      toggleAriaLabel: "\u5207\u6362\u6218\u6597\u65f6\u95f4\u7edf\u8ba1",
+      combatTimeLabel: "\u6218\u6597\u65f6\u95f4",
+      overallTimeLabel: "\u603b\u4f53\u65f6\u95f4",
+      waitingData: "\u7b49\u5f85 WCL \u9875\u9762\u6570\u636e\u52a0\u8f7d\u3002",
+      unsupportedView: "\u5f53\u524d\u4e0d\u662f\u4f24\u5bb3\u6216\u6cbb\u7597\u7edf\u8ba1\u9875\uff0c\u4e0d\u8fdb\u884c\u91cd\u7b97\u3002",
+      pullScoped: "\u5f53\u524d\u662f pull={pullNumber} \u7684\u5355\u6ce2\u9875\u9762\uff0cWCL \u5df2\u6309\u6218\u6597\u65f6\u95f4\u7edf\u8ba1\uff0c\u4e0d\u505a\u6362\u7b97\u3002",
+      noDungeonPulls: "\u5f53\u524d fight \u4e0d\u662f\u5e26 dungeon pulls \u7684\u5927\u79d8\u5883\u603b\u89c8\u3002",
+      invalidScale: "\u65e0\u6cd5\u8ba1\u7b97\u6218\u6597\u65f6\u95f4\u500d\u7387\u3002",
+      activeStatus: "\u5df2\u6309\u6218\u6597\u65f6\u95f4\u91cd\u7b97\uff0c\u500d\u7387 x{scale}\uff0c\u5171 {pullCount} \u4e2a pull\uff0c\u5df2\u6362\u7b97 {metricLabel}\u3002",
+      idleStatus: "\u5df2\u5c31\u7eea\u3002\u6253\u5f00\u540e\u4f1a\u628a {metricLabel} \u4ece\u603b\u4f53\u65f6\u95f4\u6539\u4e3a\u6218\u6597\u65f6\u95f4\u53e3\u5f84\u3002",
+      tooltipMetric: "\u6218\u6597\u65f6\u95f4{metric}\uff1a{value}"
+    }
+  };
+
+  function resolveUiLanguage() {
+    const locale =
+      typeof chrome !== "undefined" &&
+      chrome.i18n &&
+      typeof chrome.i18n.getUILanguage === "function"
+        ? chrome.i18n.getUILanguage()
+        : navigator.language;
+
+    const normalized = String(locale || "en").toLowerCase();
+    return normalized.startsWith("zh") ? "zh" : "en";
+  }
+
+  function t(key, variables) {
+    const dict = TEXT[UI_LANGUAGE] || TEXT.en;
+    let template = dict[key] || TEXT.en[key] || key;
+    if (!variables) {
+      return template;
+    }
+
+    for (const [name, value] of Object.entries(variables)) {
+      template = template.replace(new RegExp("\\{" + name + "\\}", "g"), String(value));
+    }
+    return template;
+  }
+
+  function getCombatMetric(metric) {
+    return UI_LANGUAGE === "zh" ? t("combatPrefix") + metric : t("combatPrefix") + " " + metric;
+  }
 
   function isSupportedFilterType(filterType) {
     return filterType === "damage-done" || filterType === "healing";
@@ -69,7 +139,7 @@
       return "";
     }
 
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(UI_LANGUAGE === "zh" ? "zh-CN" : "en-US", {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1
     }).format(value);
@@ -259,19 +329,19 @@
     let nextText = originalText;
     if (filterType === "healing") {
       if (/hps/i.test(originalText)) {
-        nextText = originalText.replace(/hps/i, "战斗HPS");
+        nextText = originalText.replace(/hps/i, getCombatMetric("HPS"));
       } else {
-        nextText = originalText + " 战斗";
+        nextText = originalText + " " + t("combatPrefix");
       }
     } else if (/wdps/i.test(originalText)) {
-      nextText = originalText.replace(/wdps/i, "战斗WDPS");
+      nextText = originalText.replace(/wdps/i, getCombatMetric("WDPS"));
     } else if (/dps/i.test(originalText)) {
-      nextText = originalText.replace(/dps/i, "战斗DPS");
+      nextText = originalText.replace(/dps/i, getCombatMetric("DPS"));
     } else {
-      nextText = originalText + " 战斗";
+      nextText = originalText + " " + t("combatPrefix");
     }
 
-    header.innerHTML = nextText + '<span class="wcl-combat-dps-header-tag">扩展</span>';
+    header.innerHTML = nextText + '<span class="wcl-combat-dps-header-tag">' + t("headerTag") + "</span>";
   }
 
   function patchCell(cell, scale, filterType) {
@@ -286,7 +356,13 @@
     cell.textContent = formatFullNumber(nextValue);
     cell.setAttribute("data-order", String(nextValue));
     cell.setAttribute("data-sort", String(nextValue));
-    cell.setAttribute("title", "战斗时间 " + (filterType === "healing" ? "HPS" : "DPS") + ": " + formatFullNumber(nextValue));
+    cell.setAttribute(
+      "title",
+      t("tooltipMetric", {
+        metric: filterType === "healing" ? "HPS" : "DPS",
+        value: formatFullNumber(nextValue)
+      })
+    );
     cell.classList.add("wcl-combat-dps-patched");
   }
 
@@ -470,18 +546,18 @@
       '<div class="wcl-combat-dps-widget__body">' +
       '  <div class="wcl-combat-dps-widget__top">' +
       '    <div>' +
-      '      <h2 class="wcl-combat-dps-widget__title">战斗时间统计</h2>' +
-      '      <p class="wcl-combat-dps-widget__subtitle">WCL 大秘境总览换算</p>' +
+      '      <h2 class="wcl-combat-dps-widget__title">' + t("widgetTitle") + '</h2>' +
+      '      <p class="wcl-combat-dps-widget__subtitle">' + t("widgetSubtitle") + '</p>' +
       "    </div>" +
-      '    <button type="button" class="wcl-combat-dps-widget__switch" data-role="toggle" aria-label="切换战斗时间统计"></button>' +
+      '    <button type="button" class="wcl-combat-dps-widget__switch" data-role="toggle" aria-label="' + t("toggleAriaLabel") + '"></button>' +
       "  </div>" +
       '  <div class="wcl-combat-dps-widget__meta">' +
       '    <div class="wcl-combat-dps-widget__card">' +
-      '      <span class="wcl-combat-dps-widget__label">战斗时间</span>' +
+      '      <span class="wcl-combat-dps-widget__label">' + t("combatTimeLabel") + '</span>' +
       '      <span class="wcl-combat-dps-widget__value" data-role="combat-time">--:--</span>' +
       "    </div>" +
       '    <div class="wcl-combat-dps-widget__card">' +
-      '      <span class="wcl-combat-dps-widget__label">总体时间</span>' +
+      '      <span class="wcl-combat-dps-widget__label">' + t("overallTimeLabel") + '</span>' +
       '      <span class="wcl-combat-dps-widget__value" data-role="overall-time">--:--</span>' +
       "    </div>" +
       "  </div>" +
@@ -501,7 +577,6 @@
 
     return widget;
   }
-
   function ensureWidgetMounted() {
     if (!document.body) {
       return;
@@ -534,57 +609,51 @@
     overallTime.textContent = latestState ? formatDuration(latestState.overallDurationMs) : "--:--";
 
     if (!latestState || !latestState.ready) {
-      status.textContent = "等待 WCL 页面数据加载。";
+      status.textContent = t("waitingData");
       status.dataset.state = "idle";
       return;
     }
 
     if (!isSupportedFilterType(latestState.filterType)) {
-      status.textContent = "当前不是伤害或治疗统计页，不进行重算。";
+      status.textContent = t("unsupportedView");
       status.dataset.state = "idle";
       return;
     }
 
     if (latestState.isPullScoped) {
-      status.textContent =
-        "当前是 pull=" +
-        latestState.pullNumber +
-        " 的单波页面，WCL 已经按战斗时间统计，不做换算。";
+      status.textContent = t("pullScoped", {
+        pullNumber: latestState.pullNumber
+      });
       status.dataset.state = "idle";
       return;
     }
 
     if (!latestState.hasDungeonPulls) {
-      status.textContent = "当前 fight 不是带 dungeon pulls 的大秘境总览。";
+      status.textContent = t("noDungeonPulls");
       status.dataset.state = "error";
       return;
     }
 
     if (!Number.isFinite(latestState.scale) || latestState.scale <= 0) {
-      status.textContent = "无法计算战斗时间倍率。";
+      status.textContent = t("invalidScale");
       status.dataset.state = "error";
       return;
     }
 
     if (enabled) {
-      status.textContent =
-        "已按战斗时间重算，倍率 x" +
-        latestState.scale.toFixed(2) +
-        "，共 " +
-        latestState.dungeonPullCount +
-        " 个 pull，已换算 " +
-        getMetricLabel(latestState.filterType) +
-        "。";
+      status.textContent = t("activeStatus", {
+        scale: latestState.scale.toFixed(2),
+        pullCount: latestState.dungeonPullCount,
+        metricLabel: getMetricLabel(latestState.filterType)
+      });
       status.dataset.state = "active";
     } else {
-      status.textContent =
-        "已就绪。打开后会把 " +
-        getMetricLabel(latestState.filterType) +
-        " 从总体时间改为战斗时间口径。";
+      status.textContent = t("idleStatus", {
+        metricLabel: getMetricLabel(latestState.filterType)
+      });
       status.dataset.state = "idle";
     }
   }
-
   function observeTableContainer() {
     const container = document.querySelector("#table-container");
     if (!container) {
@@ -691,3 +760,5 @@
     requestLatestState();
   }
 })();
+
+
